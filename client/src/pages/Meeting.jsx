@@ -1,122 +1,93 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
+import { useParams } from "react-router-dom";
+import socket from "../services/socket";
+import useWebRTC from "../hooks/useWebRTC";
 
-function useWebRTC() {
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
+function Meeting() {
 
-  const peerConnection = useRef(null);
+  const { meetingId } = useParams();
 
-  const [localStream, setLocalStream] = useState(null);
-
-  useEffect(() => {
-    startCamera();
-
-    return () => {
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
-      }
-
-      if (peerConnection.current) {
-        peerConnection.current.close();
-      }
-    };
-  }, []);
-
-  // Start Camera & Microphone
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-
-      setLocalStream(stream);
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-
-      createPeer(stream);
-    } catch (error) {
-      console.error("Camera Error:", error);
-    }
-  };
-
-  // Create Peer Connection
-  const createPeer = (stream) => {
-    const peer = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302",
-        },
-      ],
-    });
-
-    stream.getTracks().forEach((track) => {
-      peer.addTrack(track, stream);
-    });
-
-    peer.ontrack = (event) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-      }
-    };
-
-    peerConnection.current = peer;
-  };
-
-  // Create Offer
-  const createOffer = async () => {
-    const offer = await peerConnection.current.createOffer();
-
-    await peerConnection.current.setLocalDescription(offer);
-
-    return offer;
-  };
-
-  // Create Answer
-  const createAnswer = async (offer) => {
-    await peerConnection.current.setRemoteDescription(
-      new RTCSessionDescription(offer)
-    );
-
-    const answer = await peerConnection.current.createAnswer();
-
-    await peerConnection.current.setLocalDescription(answer);
-
-    return answer;
-  };
-
-  // Set Remote Answer
-  const setRemoteAnswer = async (answer) => {
-    await peerConnection.current.setRemoteDescription(
-      new RTCSessionDescription(answer)
-    );
-  };
-
-  // ICE Candidate
-  const addIceCandidate = async (candidate) => {
-    if (!candidate) return;
-
-    try {
-      await peerConnection.current.addIceCandidate(
-        new RTCIceCandidate(candidate)
-      );
-    } catch (error) {
-      console.error("ICE Error:", error);
-    }
-  };
-
-  return {
+  const {
     localVideoRef,
     remoteVideoRef,
-    peerConnection,
-    localStream,
-    createOffer,
-    createAnswer,
-    setRemoteAnswer,
-    addIceCandidate,
-  };
+  } = useWebRTC();
+
+  useEffect(() => {
+
+    socket.emit("join-room", meetingId);
+
+    socket.on("user-joined", (id) => {
+
+      console.log("👤 User Joined:", id);
+
+    });
+
+    return () => {
+
+      socket.off("user-joined");
+
+    };
+
+  }, [meetingId]);
+
+  return (
+
+    <div style={{ textAlign: "center" }}>
+
+      <h1>🎥 IntellMeet Meeting Room</h1>
+
+      <h2>Meeting ID : {meetingId}</h2>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "20px",
+          marginTop: "30px",
+        }}
+      >
+
+        <div>
+
+          <h3>My Camera</h3>
+
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            style={{
+              width: "400px",
+              background: "black",
+              borderRadius: "10px",
+            }}
+          />
+
+        </div>
+
+        <div>
+
+          <h3>Remote User</h3>
+
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            style={{
+              width: "400px",
+              background: "black",
+              borderRadius: "10px",
+            }}
+          />
+
+        </div>
+
+      </div>
+
+    </div>
+
+  );
+
 }
 
-export default useWebRTC;
+export default Meeting;

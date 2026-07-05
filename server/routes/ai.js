@@ -1,18 +1,49 @@
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
+const express = require("express");
+const router = express.Router();
 
-const token = jwt.sign(
-  {
-    id: user._id,
-    email: user.email,
-  },
-  process.env.JWT_SECRET,
-  {
-    expiresIn: "7d",
-  }
+const authMiddleware = require("../middleware/authMiddleware");
+
+const {
+  generateMeetingSummary,
+  getMeetings,
+  getMeetingById,
+  deleteMeeting,
+} = require("../controllers/aiController");
+
+// ==========================
+// Generate AI Summary
+// ==========================
+router.post(
+  "/summary",
+  authMiddleware,
+  generateMeetingSummary
 );
 
-res.json({
-  success: true,
-  token,
-});
+// ==========================
+// Get All Meetings
+// ==========================
+router.get(
+  "/meetings",
+  authMiddleware,
+  getMeetings
+);
+
+// ==========================
+// Get Single Meeting
+// ==========================
+router.get(
+  "/meetings/:id",
+  authMiddleware,
+  getMeetingById
+);
+
+// ==========================
+// Delete Meeting
+// ==========================
+router.delete(
+  "/meetings/:id",
+  authMiddleware,
+  deleteMeeting
+);
+
+module.exports = router;

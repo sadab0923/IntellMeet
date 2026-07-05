@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function ChatBox({ socket, roomId }) {
   const [messages, setMessages] = useState([]);
