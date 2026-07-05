@@ -7,13 +7,14 @@ function useWebRTC() {
   const peerConnection = useRef(null);
 
   const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
 
   useEffect(() => {
     startCamera();
 
     return () => {
       if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
+        localStream.getTracks().forEach((track) => track.stop());
       }
 
       if (peerConnection.current) {
@@ -21,6 +22,10 @@ function useWebRTC() {
       }
     };
   }, []);
+
+  // =============================
+  // Start Camera & Microphone
+  // =============================
 
   const startCamera = async () => {
     try {
@@ -35,15 +40,17 @@ function useWebRTC() {
         localVideoRef.current.srcObject = stream;
       }
 
-      createPeer(stream);
-
+      createPeerConnection(stream);
     } catch (err) {
-      console.log(err);
+      console.log("Camera Error:", err);
     }
   };
 
-  const createPeer = (stream) => {
+  // =============================
+  // Peer Connection
+  // =============================
 
+  const createPeerConnection = (stream) => {
     const peer = new RTCPeerConnection({
       iceServers: [
         {
@@ -52,18 +59,26 @@ function useWebRTC() {
       ],
     });
 
-    stream.getTracks().forEach(track => {
+    stream.getTracks().forEach((track) => {
       peer.addTrack(track, stream);
     });
 
     peer.ontrack = (event) => {
+      const remote = event.streams[0];
+
+      setRemoteStream(remote);
+
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+        remoteVideoRef.current.srcObject = remote;
       }
     };
 
     peerConnection.current = peer;
   };
+
+  // =============================
+  // Offer
+  // =============================
 
   const createOffer = async () => {
     const offer = await peerConnection.current.createOffer();
@@ -73,8 +88,11 @@ function useWebRTC() {
     return offer;
   };
 
-  const createAnswer = async (offer) => {
+  // =============================
+  // Answer
+  // =============================
 
+  const createAnswer = async (offer) => {
     await peerConnection.current.setRemoteDescription(offer);
 
     const answer = await peerConnection.current.createAnswer();
@@ -84,36 +102,91 @@ function useWebRTC() {
     return answer;
   };
 
+  // =============================
+  // Remote Answer
+  // =============================
+
   const setRemoteAnswer = async (answer) => {
-
     await peerConnection.current.setRemoteDescription(answer);
-
   };
 
-  const addIceCandidate = async (candidate) => {
+  // =============================
+  // ICE Candidate
+  // =============================
 
+  const addIceCandidate = async (candidate) => {
     if (!candidate) return;
 
     try {
-
       await peerConnection.current.addIceCandidate(candidate);
-
     } catch (err) {
-
       console.log(err);
-
     }
+  };
 
+  // =============================
+  // Toggle Camera
+  // =============================
+
+  const toggleCamera = () => {
+    if (!localStream) return;
+
+    const videoTrack = localStream.getVideoTracks()[0];
+
+    videoTrack.enabled = !videoTrack.enabled;
+  };
+
+  // =============================
+  // Toggle Microphone
+  // =============================
+
+  const toggleMic = () => {
+    if (!localStream) return;
+
+    const audioTrack = localStream.getAudioTracks()[0];
+
+    audioTrack.enabled = !audioTrack.enabled;
+  };
+
+  // =============================
+  // Screen Share
+  // =============================
+
+  const startScreenShare = async () => {
+    try {
+      const screenStream =
+        await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+        });
+
+      const screenTrack = screenStream.getVideoTracks()[0];
+
+      const sender = peerConnection.current
+        .getSenders()
+        .find((s) => s.track.kind === "video");
+
+      if (sender) {
+        sender.replaceTrack(screenTrack);
+      }
+
+      screenTrack.onended = () => {
+        const cameraTrack = localStream.getVideoTracks()[0];
+
+        sender.replaceTrack(cameraTrack);
+      };
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   return {
-
     localVideoRef,
     remoteVideoRef,
 
-    peerConnection,
-
     localStream,
+    remoteStream,
+
+    peerConnection,
 
     createOffer,
     createAnswer,
@@ -122,6 +195,10 @@ function useWebRTC() {
 
     addIceCandidate,
 
+    toggleCamera,
+    toggleMic,
+
+    startScreenShare,
   };
 }
 
